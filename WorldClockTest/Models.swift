@@ -64,7 +64,7 @@ struct CityTimeZone: Identifiable {
 
     func isDaytime(for date: Date) -> Bool {
         let h = hour(for: date)
-        return h >= 6 && h < 20
+        return h >= 6 && h < 18
     }
 
     // MARK: - Offset
@@ -79,15 +79,12 @@ struct CityTimeZone: Identifiable {
 }
 
 // MARK: - Hard-coded Cities
-
-extension CityTimeZone {
-    static let defaultCities: [CityTimeZone] = [
-        CityTimeZone(city: "Bali",     timeZoneIdentifier: "Asia/Makassar",     isLocal: true),
-        CityTimeZone(city: "New York", timeZoneIdentifier: "America/New_York",  isLocal: false),
-        CityTimeZone(city: "Sydney",   timeZoneIdentifier: "Australia/Sydney",  isLocal: false),
-    ]
-}
-
+let citiesDatabase: [CityTimeZone] = [
+    CityTimeZone(city: "Bali",     timeZoneIdentifier: "Asia/Makassar",     isLocal: true),
+    CityTimeZone(city: "New York", timeZoneIdentifier: "America/New_York",  isLocal: false),
+    CityTimeZone(city: "Tokyo", timeZoneIdentifier: "Asia/Tokyo",  isLocal: false),
+    CityTimeZone(city: "Sydney",   timeZoneIdentifier: "Australia/Sydney",  isLocal: false),
+]
 // MARK: - Working Hours Config
 
 struct WorkingHours {
