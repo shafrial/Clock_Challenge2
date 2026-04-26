@@ -96,12 +96,10 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showCalendar){
             CalendarSheetView(
-                date: Binding(
-                    get: { referenceDate },
-                    set: { selectedDay in
-                        selectDay(selectedDay)
-                    }
-                )
+                selectedDate: referenceDate,
+                onSelectDate: { selectedDay in
+                    selectDay(selectedDay)
+                }
             )
             .environment(\.timeZone, baseTZ)
         }
