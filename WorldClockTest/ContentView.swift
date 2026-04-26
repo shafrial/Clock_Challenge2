@@ -23,20 +23,31 @@ struct ContentView: View {
         NavigationStack{
             ZStack {
                 VStack(spacing: 0) {
-                    // ── Clock cards ──────────────────────────────────────────
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 12) {
-                            ForEach(cities) { city in
-                                TimeZoneCardView(
-                                    city: city,
-                                    referenceDate: referenceDate,
-                                    baseTZ: baseTZ
-                                )
+                    List {
+                        ForEach(cities) { city in
+                            TimeZoneCardView(
+                                city: city,
+                                referenceDate: referenceDate,
+                                baseTZ: baseTZ
+                            )
+                            .listRowInsets(
+                                EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
+                            )
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: !city.isLocal) {
+                                if !city.isLocal {
+                                    Button(role: .destructive) {
+                                        deleteCity(city)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
                             }
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
                     }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                     HorizontalDialSliderView(
                         referenceDate: referenceDate,
                         baseTZ: baseTZ,
@@ -110,6 +121,15 @@ struct ContentView: View {
         }) else { return }
 
         cities.append(city)
+    }
+
+    private func deleteCity(_ city: CityTimeZone) {
+        guard !city.isLocal else { return }
+
+        cities.removeAll { existingCity in
+            existingCity.city == city.city &&
+            existingCity.timeZoneIdentifier == city.timeZoneIdentifier
+        }
     }
 
     private func selectDay(_ selectedDay: Date) {
