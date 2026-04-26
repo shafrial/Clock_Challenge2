@@ -76,6 +76,16 @@ struct ContentView: View {
                 ToolbarItem(placement: .bottomBar) {
                         Spacer()
                 }
+                ToolbarItem(placement: .bottomBar) {
+                    if isLiveClockPaused {
+                        Button("Reset to now") {
+                            resetToNow()
+                        }
+                    }
+                }
+                ToolbarItem(placement: .bottomBar) {
+                        Spacer()
+                }
                 ToolbarItem(placement: .bottomBar){
                     Button("", systemImage: "square.and.arrow.up"){
                         showShare = true
@@ -110,6 +120,11 @@ struct ContentView: View {
     private func selectReferenceDate(_ newDate: Date) {
         isLiveClockPaused = true
         referenceDate = newDate
+    }
+
+    private func resetToNow() {
+        isLiveClockPaused = false
+        referenceDate = Date()
     }
 
     private func addCity(_ city: CityTimeZone) {
