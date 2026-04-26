@@ -135,11 +135,11 @@ struct TimeZoneCardView_Previews: PreviewProvider {
         ZStack {
             Color.black.ignoresSafeArea()
             VStack(spacing: 12) {
-                ForEach(citiesDatabase) { city in
+                ForEach(defaultCities) { city in
                     TimeZoneCardView(
                         city: city,
                         referenceDate: Date(),
-                        baseTZ: citiesDatabase[0].timeZone
+                        baseTZ: defaultCities[0].timeZone
                     )
                 }
             }

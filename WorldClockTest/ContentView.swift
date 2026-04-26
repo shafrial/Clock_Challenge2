@@ -9,8 +9,9 @@ struct ContentView: View {
     @State private var isLiveClockPaused: Bool = false
     @State private var showShare: Bool = false
     @State private var showCalendar: Bool = false
+    @State private var showAddCitySheet: Bool = false
+    @State private var cities: [CityTimeZone] = defaultCities
 
-    private let cities = citiesDatabase
     private var baseTZ: TimeZone { cities[0].timeZone }
 
     // Auto-update every second until the user manually selects a time.
@@ -52,7 +53,9 @@ struct ContentView: View {
             .navigationTitle("Match Time")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing){
-                    Button("", systemImage: "plus"){}
+                    Button("", systemImage: "plus"){
+                        showAddCitySheet = true
+                    }
                 }
                 ToolbarItem(placement: .bottomBar){
                     Button("", systemImage: "calendar"){
@@ -68,6 +71,14 @@ struct ContentView: View {
                     }
                 }
             }
+        }
+        .sheet(isPresented: $showAddCitySheet){
+            AddCitySheetView(
+                selectedCities: cities,
+                onSelectCity: { city in
+                    addCity(city)
+                }
+            )
         }
         .sheet(isPresented: $showShare){
             ShareProposalView(cities: cities, referenceDate: referenceDate)
@@ -90,6 +101,15 @@ struct ContentView: View {
     private func selectReferenceDate(_ newDate: Date) {
         isLiveClockPaused = true
         referenceDate = newDate
+    }
+
+    private func addCity(_ city: CityTimeZone) {
+        guard !cities.contains(where: { existingCity in
+            existingCity.city == city.city &&
+            existingCity.timeZoneIdentifier == city.timeZoneIdentifier
+        }) else { return }
+
+        cities.append(city)
     }
 
     private func selectDay(_ selectedDay: Date) {
