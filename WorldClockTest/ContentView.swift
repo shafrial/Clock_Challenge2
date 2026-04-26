@@ -6,66 +6,47 @@ struct ContentView: View {
     // MARK: - State
 
     @State private var referenceDate: Date = Date()
-    @State private var isDragging: Bool = false
+    @State private var isLiveClockPaused: Bool = false
     @State private var showShare: Bool = false
+    @State private var showCalendar: Bool = false
 
-    private let cities = CityTimeZone.defaultCities
+    private let cities = citiesDatabase
     private var baseTZ: TimeZone { cities[0].timeZone }
 
-    // Auto-update every second when not dragging
+    // Auto-update every second until the user manually selects a time.
     private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-
-    // MARK: - Slider fraction (0–1 within Bali's day)
-
-    private var sliderFraction: Double {
-        var cal = Calendar.current
-        cal.timeZone = baseTZ
-        let startOfDay = cal.startOfDay(for: referenceDate)
-        let elapsed = referenceDate.timeIntervalSince(startOfDay)
-        return max(0, min(1, elapsed / 86_400))
-    }
 
     // MARK: - Body
 
     var body: some View {
         NavigationStack{
             ZStack {
-                
-                VStack() {
-                    HStack(alignment: .top, spacing: 0) {
-                        // ── Clock cards ──────────────────────────────────────────
-                        ScrollView(showsIndicators: false) {
-                            VStack(spacing: 12) {
-                                ForEach(cities) { city in
-                                    TimeZoneCardView(
-                                        city: city,
-                                        referenceDate: referenceDate,
-                                        baseTZ: baseTZ
-                                    )
-                                }
+                VStack(spacing: 0) {
+                    // ── Clock cards ──────────────────────────────────────────
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 12) {
+                            ForEach(cities) { city in
+                                TimeZoneCardView(
+                                    city: city,
+                                    referenceDate: referenceDate,
+                                    baseTZ: baseTZ
+                                )
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
                         }
-                        
-                        // ── Vertical slider ──────────────────────────────────────
-                        VerticalTimeSlider(
-                            cities: cities,
-                            baseTZ: baseTZ,
-                            fraction: sliderFraction,
-                            onDrag: { f in
-                                isDragging = true
-                                setReferenceDate(fraction: f)
-                            }
-                        )
-                        .padding(.top, 14)
-                        .padding(.trailing, 14)
-                        .padding(.leading, 8)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
                     }
+                    HorizontalDialSliderView(
+                        referenceDate: referenceDate,
+                        baseTZ: baseTZ,
+                        onDateChange: { newDate in
+                            selectReferenceDate(newDate)
+                        }
+                    )
                 }
             }
             .onReceive(ticker) { _ in
-                guard !isDragging else { return }
+                guard !isLiveClockPaused else { return }
                 referenceDate = Date()
             }
             .navigationTitle("Match Time")
@@ -74,7 +55,9 @@ struct ContentView: View {
                     Button("", systemImage: "plus"){}
                 }
                 ToolbarItem(placement: .bottomBar){
-                    Button("", systemImage: "calendar"){}
+                    Button("", systemImage: "calendar"){
+                        showCalendar =  true
+                    }
                 }
                 ToolbarItem(placement: .bottomBar) {
                         Spacer()
@@ -89,29 +72,52 @@ struct ContentView: View {
         .sheet(isPresented: $showShare){
             ShareProposalView(cities: cities, referenceDate: referenceDate)
         }
+        .sheet(isPresented: $showCalendar){
+            CalendarSheetView(
+                date: Binding(
+                    get: { referenceDate },
+                    set: { selectedDay in
+                        selectDay(selectedDay)
+                    }
+                )
+            )
+            .environment(\.timeZone, baseTZ)
+        }
     }
         
     // MARK: - Helpers
 
-    private func resetToNow() {
-        isDragging = false
-        referenceDate = Date()
+    private func selectReferenceDate(_ newDate: Date) {
+        isLiveClockPaused = true
+        referenceDate = newDate
     }
 
-    /// Convert a 0–1 slider fraction into a Date within the base TZ's day.
-    private func setReferenceDate(fraction: Double) {
+    private func selectDay(_ selectedDay: Date) {
+        selectReferenceDate(dateByKeepingCurrentTime(on: selectedDay))
+    }
+
+    private func dateByKeepingCurrentTime(on selectedDay: Date) -> Date {
         var cal = Calendar.current
         cal.timeZone = baseTZ
-        let startOfDay = cal.startOfDay(for: referenceDate)
-        referenceDate = startOfDay.addingTimeInterval(fraction * 86_400)
+
+        let day = cal.dateComponents([.year, .month, .day], from: selectedDay)
+        let time = cal.dateComponents([.hour, .minute, .second, .nanosecond], from: referenceDate)
+
+        var components = DateComponents()
+        components.timeZone = baseTZ
+        components.year = day.year
+        components.month = day.month
+        components.day = day.day
+        components.hour = time.hour
+        components.minute = time.minute
+        components.second = time.second
+        components.nanosecond = time.nanosecond
+
+        return cal.date(from: components) ?? selectedDay
     }
 }
 
 // MARK: - Preview
-
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        ContentView()
-            .preferredColorScheme(.dark)
-    }
+#Preview {
+    ContentView().preferredColorScheme(.dark)
 }
