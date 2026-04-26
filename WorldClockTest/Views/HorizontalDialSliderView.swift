@@ -180,7 +180,7 @@ struct HorizontalDialSliderView: View {
 #Preview {
     HorizontalDialSliderView(
         referenceDate: Date(),
-        baseTZ: citiesDatabase[0].timeZone,
+        baseTZ: defaultCities[0].timeZone,
         onDateChange: { _ in }
     ).preferredColorScheme(.dark)
 }
