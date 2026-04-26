@@ -9,13 +9,13 @@ import SwiftUI
 
 struct CalendarSheetView: View {
     @Environment(\.dismiss) private var dismiss
-    @Binding private var date: Date
+    let onSelectDate: (Date) -> Void
 
     @State private var draftDate: Date
 
-    init(date: Binding<Date>) {
-        self._date = date
-        self._draftDate = State(initialValue: date.wrappedValue)
+    init(selectedDate: Date, onSelectDate: @escaping (Date) -> Void) {
+        self.onSelectDate = onSelectDate
+        self._draftDate = State(initialValue: selectedDate)
     }
     
     var body: some View {
@@ -41,7 +41,7 @@ struct CalendarSheetView: View {
 
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
-                        date = draftDate
+                        onSelectDate(draftDate)
                         dismiss()
                     }
                 }
@@ -51,4 +51,3 @@ struct CalendarSheetView: View {
         .presentationDetents([.medium])
     }
 }
-
