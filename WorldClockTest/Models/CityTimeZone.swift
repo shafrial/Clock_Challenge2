@@ -1,9 +1,17 @@
 import Foundation
 
+// Core data model for a city shown in the app.
+// It stores the city identity and also provides small helper methods for
+// formatting the same absolute Date in that city's time zone.
 struct CityTimeZone: Identifiable {
+    // UUID makes each row identifiable for SwiftUI.
+    // Duplicate prevention is handled manually in ContentView/AddCitySheetView
+    // because two CityTimeZone instances with the same city still get different UUIDs.
     let id: UUID
     let city: String
     let timeZoneIdentifier: String
+
+    // The local city is special: it becomes the base time zone and cannot be deleted.
     let isLocal: Bool
 
     init(city: String, timeZoneIdentifier: String, isLocal: Bool = false) {
@@ -14,6 +22,7 @@ struct CityTimeZone: Identifiable {
     }
 
     var timeZone: TimeZone {
+        // Fallback to .current prevents a crash if a time zone identifier is mistyped.
         TimeZone(identifier: timeZoneIdentifier) ?? .current
     }
 
@@ -68,6 +77,8 @@ struct CityTimeZone: Identifiable {
     // MARK: - Offset
 
     func offsetString(from base: TimeZone, at date: Date) -> String {
+        // Offsets are calculated at the selected date because daylight saving time
+        // can make the difference between two cities change during the year.
         let myOffset = timeZone.secondsFromGMT(for: date)
         let baseOffset = base.secondsFromGMT(for: date)
         let diffHours = (myOffset - baseOffset) / 3600

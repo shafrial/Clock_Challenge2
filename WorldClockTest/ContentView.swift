@@ -1,28 +1,40 @@
 import SwiftUI
 internal import Combine
 
+// ContentView is the coordinator for the screen.
+// It owns the important app state, passes that state into child views,
+// and receives events back from children through callback closures.
 struct ContentView: View {
 
     // MARK: - State
 
-    // The central date that all views synchronize with. Defaults to current date/time.
+    // This is the single source of truth for "the time the app is showing".
+    // Every time-zone card and the horizontal dial reads from this same Date.
     @State private var referenceDate: Date = Date()
-    // Tracks whether the live ticking clock is paused (happens when user interacts with the timeline)
+
+    // When false, the timer below keeps replacing referenceDate with Date().
+    // When true, the user has chosen a custom time/date, so the live clock stops
+    // until the user taps "Reset to now".
     @State private var isLiveClockPaused: Bool = false
+
     // Controls the presentation of the Share proposal sheet
     @State private var showShare: Bool = false
+
     // Controls the presentation of the Calendar date picker sheet
     @State private var showCalendar: Bool = false
+
     // Controls the presentation of the Add City search sheet
     @State private var showAddCitySheet: Bool = false
+
     // The user's currently selected list of cities
     @State private var cities: [CityTimeZone] = defaultCities
 
-    // Computes the base time zone using the first city in the list (assumed to be local)
+    // The first city is treated as the user's base/local city.
+    // Other views use this to calculate offsets and to interpret calendar days.
     private var baseTZ: TimeZone { cities[0].timeZone }
 
     // A timer that fires every second to keep the clock updating in real-time.
-    // It auto-connects upon view creation.
+    // It only changes the UI while isLiveClockPaused is false.
     private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     // MARK: - Body
@@ -31,28 +43,31 @@ struct ContentView: View {
         NavigationStack{
             ZStack {
                 VStack(spacing: 0) {
-                    // List of all selected cities displaying their respective times
+                    // Child views do not own the city list or selected date.
+                    // They receive the data from ContentView so the screen stays synchronized.
                     TimeZoneCardListView(
                         cities: cities,
                         referenceDate: referenceDate,
                         baseTZ: baseTZ,
                         onDeleteCity: { city in
+                            // TimeZoneCardListView only reports which city was deleted.
+                            // ContentView performs the actual state mutation.
                             deleteCity(city)
                         }
                     )
                     
-                    // The custom timeline slider for adjusting the time manually
+                    // The dial converts scrolling into a Date, then sends that Date
+                    // back through onDateChange. ContentView decides what to do with it.
                     HorizontalDialSliderView(
                         referenceDate: referenceDate,
                         baseTZ: baseTZ,
                         onDateChange: { newDate in
-                            // When the user drags the slider, update the global reference date
                             selectReferenceDate(newDate)
                         }
                     )
                 }
             }
-            // Listen to the 1-second timer to update the reference date if not paused
+            // This keeps the app live while the user is not manually exploring another time.
             .onReceive(ticker) { _ in
                 guard !isLiveClockPaused else { return }
                 referenceDate = Date()
@@ -100,6 +115,9 @@ struct ContentView: View {
             AddCitySheetView(
                 selectedCities: cities,
                 onSelectCity: { city in
+                    // The sheet sends the selected city back here.
+                    // Keeping the append logic in ContentView prevents the sheet
+                    // from directly owning or mutating the main city list.
                     addCity(city)
                 }
             )
@@ -113,6 +131,8 @@ struct ContentView: View {
             CalendarSheetView(
                 selectedDate: referenceDate,
                 onSelectDate: { selectedDay in
+                    // CalendarSheetView selects only a day.
+                    // ContentView combines that day with the current time.
                     selectDay(selectedDay)
                 }
             )
@@ -122,19 +142,22 @@ struct ContentView: View {
         
     // MARK: - Helpers
 
-    // Updates the central date and pauses the live ticking clock
+    // Any manual time change goes through this helper.
+    // That gives one consistent rule: manual selection pauses the live clock.
     private func selectReferenceDate(_ newDate: Date) {
         isLiveClockPaused = true
         referenceDate = newDate
     }
 
-    // Resumes the live ticking clock and sets the time back to current
+    // Resumes the live clock and immediately returns the app to the current time.
     private func resetToNow() {
         isLiveClockPaused = false
         referenceDate = Date()
     }
 
-    // Appends a new city to the list if it isn't already present
+    // Appends a new city to the list if it is not already present.
+    // The duplicate check uses city + time zone because UUID is different
+    // for every CityTimeZone instance.
     private func addCity(_ city: CityTimeZone) {
         guard !cities.contains(where: { existingCity in
             existingCity.city == city.city &&
@@ -144,7 +167,8 @@ struct ContentView: View {
         cities.append(city)
     }
 
-    // Removes a city from the list, safeguarding the local base city
+    // Removes a city from the list, but never removes the local/base city.
+    // The first city is important because baseTZ depends on it.
     private func deleteCity(_ city: CityTimeZone) {
         guard !city.isLocal else { return }
 
@@ -154,12 +178,16 @@ struct ContentView: View {
         }
     }
 
-    // Updates the current date to a newly selected day, preserving the current time components
+    // Calendar selection changes the day, not the current hour/minute.
+    // Example: if the app shows 14:30 and user picks Friday,
+    // the result should be Friday at 14:30 in the base time zone.
     private func selectDay(_ selectedDay: Date) {
         selectReferenceDate(dateByKeepingCurrentTime(on: selectedDay))
     }
 
-    // Helper that merges the year/month/day from the selected day with the hour/minute/second of the current reference date
+    // Merges the selected calendar day with the current selected time.
+    // This uses baseTZ so "day" means the day in the user's local/base city,
+    // not accidentally the device/default calendar time zone.
     private func dateByKeepingCurrentTime(on selectedDay: Date) -> Date {
         var cal = Calendar.current
         cal.timeZone = baseTZ

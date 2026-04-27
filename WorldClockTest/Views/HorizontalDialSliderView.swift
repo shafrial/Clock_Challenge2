@@ -7,38 +7,73 @@
 
 import SwiftUI
 
-// A custom horizontal slider that allows users to adjust time in 5-minute increments.
-// It creates an illusion of infinite scrolling by using a massive range of integer "slots".
+// HorizontalDialSliderView turns horizontal scrolling into a Date.
+//
+// Mental model:
+// - The dial does not store "hour" and "minute" directly.
+// - It stores a centered integer slot in scrollPosition.
+// - Each slot is 5 minutes.
+// - slot 0 means anchorDate.
+// - slot 1 means anchorDate + 5 minutes.
+// - slot -1 means anchorDate - 5 minutes.
+//
+// Because slot values can be negative or positive, scrolling left can move to
+// previous days and scrolling right can move to future days.
 struct HorizontalDialSliderView: View {
-    // The centralized time the app is currently displaying
+    // The centralized time the app is currently displaying.
+    // ContentView owns this value and passes it down here.
     let referenceDate: Date
-    // The base time zone to perform calendar calculations against
+
+    // The base time zone defines what "start of day", "midnight", and labels mean.
+    // Without this, Calendar.current could use a different time zone than the base city.
     let baseTZ: TimeZone
-    // Callback fired when the user scrolls to a new time
+
+    // Callback fired when the user scrolls to a new time.
+    // This view calculates the Date, but ContentView decides how to store it.
     let onDateChange: (Date) -> Void
 
-    // Each slot on the dial represents 5 minutes
+    // Each visual tick represents 5 minutes.
+    // 24 hours * 60 minutes / 5 = 288 slots per day.
     private let slotMinutes = 5
-    // A massive range of slots (-20,000 to 20,000) that gives the illusion of an infinite slider
+
+    // SwiftUI needs a finite ForEach range, so this is not truly infinite.
+    // It is intentionally huge enough that the user can scroll many days away.
+    // If a programmatic date ever lands outside this range, syncScrollPosition
+    // recenters anchorDate and recalculates the slot.
     private let slotRange = -20_000...20_000
+
     // The horizontal spacing between each tick mark
     private let tickSpacing: CGFloat = 8
 
-    // The start of the current day, used as a zero-point for calculating times from slot indices
+    // The zero-point for the slot system.
+    // Usually this is midnight at the start of the current referenceDate's day
+    // in baseTZ. Example: if referenceDate is Apr 27, 14:30, anchorDate is
+    // Apr 27, 00:00 in the base time zone.
     @State private var anchorDate: Date?
-    // The currently centered slot index in the scroll view
+
+    // The id of the tick currently aligned to the center of the ScrollView.
+    // SwiftUI updates this because of .scrollPosition(id:anchor:).
     @State private var scrollPosition: Int?
+
     // Tracks the physical size of the view to dynamically pad the scroll edges
     @State private var viewSize: CGSize = .zero
-    // Ensures the view is fully set up before triggering scroll change callbacks
+
+    // Prevents the first programmatic scroll setup from being treated like a user drag.
     @State private var initialized: Bool = false
-    // A flag to prevent an infinite feedback loop between the app changing the date and the scroll view updating
+
+    // Prevents a feedback loop:
+    // 1. ContentView changes referenceDate.
+    // 2. This view updates scrollPosition to match that Date.
+    // 3. scrollPosition changes.
+    // 4. Without this flag, step 3 would call onDateChange and send the same
+    //    update back to ContentView again.
     @State private var isSyncingFromReferenceDate: Bool = false
 
     var body: some View {
         ScrollView(.horizontal) {
             LazyHStack(alignment: .bottom, spacing: tickSpacing) {
-                // Renders the 40,000 tick marks lazily as the user scrolls
+                // LazyHStack means SwiftUI does not render all 40,001 ticks at once.
+                // It creates views near the visible scroll area as needed.
                 ForEach(slotRange, id: \.self) { slot in
                     tickView(for: slot)
                         .id(slot)
@@ -49,20 +84,27 @@ struct HorizontalDialSliderView: View {
             .scrollTargetLayout()
         }
         .onAppear {
-            // Establish the zero-point anchor based on the initial date
+            // 1. Pick the zero-point for calculations.
             anchorDate = startOfDay(for: referenceDate)
-            // Move the scroll view to the correct position for the initial date
+
+            // 2. Move the dial so the current referenceDate is centered.
             syncScrollPosition(to: referenceDate)
 
-            // Allow the UI a moment to layout before enabling interactive callbacks
+            // 3. Delay user callbacks briefly so initial layout changes do not
+            // accidentally pause the live clock in ContentView.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 initialized = true
             }
         }
         .onChange(of: referenceDate) { _, newDate in
-            // When the app's time updates externally (e.g., from live ticking or calendar),
-            // calculate the corresponding slot.
+            // This runs when the parent changes the date, for example:
+            // - live timer tick
+            // - calendar sheet selection
+            // - reset to now
+            //
+            // The dial must visually follow referenceDate, so we convert Date -> slot.
             let targetSlot = slotIndex(for: newDate)
+
             // Only scroll if we aren't already at that slot
             guard scrollPosition != targetSlot else { return }
             syncScrollPosition(to: newDate)
@@ -76,8 +118,13 @@ struct HorizontalDialSliderView: View {
         .defaultScrollAnchor(.center, for: .initialOffset)
         .defaultScrollAnchor(.center, for: .sizeChanges)
         .onChange(of: scrollPosition) { _, newSlot in
-            // When the user drags to a new slot, we notify the app of the new time.
-            // We ignore this if the view isn't ready or if the app itself caused the scroll.
+            // This runs when the centered tick changes.
+            //
+            // If the user dragged the dial, this is the main output path:
+            // scrollPosition -> Date -> onDateChange -> ContentView.referenceDate.
+            //
+            // If the app changed referenceDate first, isSyncingFromReferenceDate is true,
+            // so we do not send the same change back to the parent.
             guard initialized, !isSyncingFromReferenceDate, let newSlot else { return }
             onDateChange(date(for: newSlot))
         }
@@ -100,8 +147,11 @@ struct HorizontalDialSliderView: View {
 
     // MARK: - Ticks
 
-    // Renders the visual line and optional text label for a single slot
+    // Renders the visual line and optional text label for a single slot.
+    // This function is visual only. The actual date calculation happens in date(for:).
     private func tickView(for slot: Int) -> some View {
+        // Convert the absolute slot into a minute inside one 24-hour day.
+        // Example: slot 288 is next midnight, but its minuteOfDay is still 0.
         let minute = minuteOfDay(for: slot)
         let isSelected = slot == scrollPosition
         let isHour = minute % 60 == 0
@@ -158,12 +208,17 @@ struct HorizontalDialSliderView: View {
 
     // MARK: - Date Mapping
 
-    // Updates the scroll view programmatically to match a target Date
+    // Updates the scroll view programmatically to match a target Date.
+    //
+    // This is used when the parent owns the change.
+    // Example: ContentView sets referenceDate from the calendar sheet, so the dial
+    // needs to jump to the matching slot.
     private func syncScrollPosition(to date: Date) {
         var targetSlot = slotIndex(for: date)
 
-        // If the date is so far away that it exceeds our 40,000 slot range,
-        // we re-center the anchor date to the new day and recalculate the slot.
+        // The range is large but finite. If a target date is too far from the
+        // current anchorDate, make the target date's day the new zero-point.
+        // This keeps the visual range usable without needing a truly infinite ForEach.
         if !slotRange.contains(targetSlot) {
             anchorDate = startOfDay(for: date)
             targetSlot = slotIndex(for: date)
@@ -172,7 +227,8 @@ struct HorizontalDialSliderView: View {
         // Safety check to ensure we don't crash by scrolling out of bounds
         guard slotRange.contains(targetSlot) else { return }
 
-        // Set the flag to true so the onChange(scrollPosition) doesn't fire backwards
+        // Programmatic scroll update starts here.
+        // The flag tells onChange(scrollPosition) to ignore this particular change.
         isSyncingFromReferenceDate = true
         scrollPosition = targetSlot
 
@@ -182,19 +238,35 @@ struct HorizontalDialSliderView: View {
         }
     }
 
-    // Calculates which integer slot represents the given date, relative to the anchorDate
+    // Converts Date -> slot.
+    //
+    // Formula:
+    // minutesFromAnchor = date - anchorDate
+    // slot = minutesFromAnchor / 5
+    //
+    // Example when anchorDate is Monday 00:00:
+    // Monday 00:00 -> slot 0
+    // Monday 00:05 -> slot 1
+    // Monday 01:00 -> slot 12
+    // Tuesday 00:00 -> slot 288
     private func slotIndex(for date: Date) -> Int {
         let anchor = resolvedAnchorDate(for: date)
-        // Find total minutes difference from the start of the day
         let minutes = date.timeIntervalSince(anchor) / 60
-        // Divide by 5 (slotMinutes) and round to the nearest slot
+
+        // Round to the nearest 5-minute slot so seconds from the live clock
+        // do not create fractional positions.
         return Int((minutes / Double(slotMinutes)).rounded())
     }
 
-    // Calculates the actual Date corresponding to an integer slot index
+    // Converts slot -> Date.
+    //
+    // This is called when the user scrolls.
+    // Example: slot 289 means anchorDate + 1 day + 5 minutes.
+    // That is why the dial can move to tomorrow or yesterday without needing
+    // special "next day" code.
     private func date(for slot: Int) -> Date {
         let anchor = resolvedAnchorDate(for: referenceDate)
-        // Add (slot * 5 minutes) to the start of the day
+
         return calendar.date(
             byAdding: .minute,
             value: slot * slotMinutes,
@@ -202,15 +274,24 @@ struct HorizontalDialSliderView: View {
         ) ?? anchor.addingTimeInterval(TimeInterval(slot * slotMinutes * 60))
     }
 
-    // Standardizes the time into a 24-hour minute value (0-1439) to determine if it's an hour, midnight, etc.
+    // Converts any slot into a display minute inside a single day, from 0 to 1439.
+    //
+    // Important difference:
+    // - date(for:) preserves the actual day movement.
+    // - minuteOfDay(for:) only decides how the tick should look and what label to show.
     private func minuteOfDay(for slot: Int) -> Int {
         let minutesPerDay = 24 * 60
         let minutes = slot * slotMinutes
-        // Uses double modulo logic to correctly handle negative slots
+
+        // Swift's % can return a negative result for negative inputs.
+        // This double-modulo pattern wraps negative slots back into 0...1439.
+        // Example: -5 minutes becomes 1435, which is 11:55 PM.
         return ((minutes % minutesPerDay) + minutesPerDay) % minutesPerDay
     }
 
-    // Safely unwraps the established anchorDate, or creates a new one if missing
+    // Safely unwraps the established anchorDate.
+    // The fallback protects previews or unusual timing where calculations run
+    // before onAppear has assigned anchorDate.
     private func resolvedAnchorDate(for fallbackDate: Date) -> Date {
         anchorDate ?? startOfDay(for: fallbackDate)
     }
