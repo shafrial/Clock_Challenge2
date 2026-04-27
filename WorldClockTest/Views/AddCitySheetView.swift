@@ -7,7 +7,9 @@
 
 import SwiftUI
 
-// A sheet that provides a searchable list to add a new city from the global catalog
+// A sheet that provides a searchable list to add a new city from the global catalog.
+// It receives the current selected cities so it can hide duplicates, then sends
+// the chosen city back to ContentView through onSelectCity.
 struct AddCitySheetView: View {
     // Environment property to close the sheet programmatically
     @Environment(\.dismiss) private var dismiss
@@ -16,7 +18,9 @@ struct AddCitySheetView: View {
 
     // The list of cities the user has already added, passed in to filter them out of the catalog
     let selectedCities: [CityTimeZone]
-    // Callback executed when the user taps on a city to add it
+    // Callback executed when the user taps on a city to add it.
+    // This is a callback instead of @Binding because the child is reporting
+    // an event ("user selected this city"), not directly editing one simple value.
     let onSelectCity: (CityTimeZone) -> Void
 
     // Dynamically computes the list of cities to display based on existing selections and the search text

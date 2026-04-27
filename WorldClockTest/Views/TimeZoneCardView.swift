@@ -1,6 +1,8 @@
 import SwiftUI
 
-// A card view representing a single city, displaying its local time, day/night status, and working hours
+// Displays one city at one shared referenceDate.
+// This view does not own time state. When referenceDate changes in ContentView,
+// SwiftUI re-renders this card and all formatted values update automatically.
 struct TimeZoneCardView: View {
     // The city data model
     let city: CityTimeZone
@@ -11,12 +13,14 @@ struct TimeZoneCardView: View {
 
     // MARK: - Computed
 
-    // Formatted string showing the time difference from the base city (e.g., "+3h")
+    // Formatted string showing the time difference from the base city (e.g., "+3h").
+    // It is recalculated for referenceDate because daylight saving time can change offsets.
     private var offset: String {
         city.offsetString(from: baseTZ, at: referenceDate)
     }
 
-    // Boolean indicating if the reference date falls within standard working hours for this city
+    // These booleans keep the body easier to read.
+    // The time-zone-specific logic stays inside CityTimeZone.
     private var isWorking: Bool {
         city.isWorkingHour(for: referenceDate)
     }

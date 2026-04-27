@@ -1,6 +1,8 @@
 import SwiftUI
 
-// A view that generates a textual summary of selected times and allows the user to copy or share it
+// Generates a meeting proposal using the same referenceDate shown by the cards.
+// The view is read-only with respect to app state: it formats the selected data
+// and only owns local UI state for the "Copied!" feedback.
 struct ShareProposalView: View {
     // The list of chosen cities
     let cities: [CityTimeZone]
@@ -14,7 +16,8 @@ struct ShareProposalView: View {
 
     // MARK: - Share text
 
-    // Dynamically generates the human-readable proposal sentence
+    // Dynamically generates the human-readable proposal sentence.
+    // The first city is treated as the base/local city, matching ContentView.baseTZ.
     private var shareMessage: String {
         guard let base = cities.first else { return "" }
 
@@ -36,7 +39,8 @@ struct ShareProposalView: View {
         let date = dateFmt.string(from: referenceDate)
         let time = timeFmt.string(from: referenceDate)
 
-        // Generate the time strings for all other non-base cities
+        // Generate the time strings for all other non-base cities by reusing
+        // the same DateFormatter and changing only its time zone.
         let others = cities.dropFirst().map { city -> String in
             timeFmt.timeZone = city.timeZone
             return "\(timeFmt.string(from: referenceDate)) for \(city.city)"

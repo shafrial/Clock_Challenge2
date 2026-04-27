@@ -7,11 +7,15 @@
 
 import SwiftUI
 
-// A sheet containing a graphical calendar to quickly jump to a specific date
+// A sheet containing a graphical calendar to quickly jump to a specific date.
+// It uses local draftDate while the sheet is open, then sends the final choice
+// back to ContentView only when the user taps Done.
 struct CalendarSheetView: View {
     // Environment property to close the sheet programmatically
     @Environment(\.dismiss) private var dismiss
-    // Callback executed when the user confirms their date selection
+    // Callback executed when the user confirms their date selection.
+    // @escaping is required in the initializer because the closure is stored
+    // in this struct and called later, after init has finished.
     let onSelectDate: (Date) -> Void
 
     // Local state representing the currently selected date in the picker before confirming

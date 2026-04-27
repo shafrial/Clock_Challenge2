@@ -1,7 +1,12 @@
+// Cities shown when the app first launches.
+// The first city is treated as the local/base city by ContentView.
 let defaultCities: [CityTimeZone] = [
     CityTimeZone(city: "Bali", timeZoneIdentifier: "Asia/Makassar", isLocal: true),
 ]
 
+// Static MVP catalog used by AddCitySheetView.
+// Each entry uses an IANA time zone identifier so Foundation can calculate
+// daylight saving time and offsets correctly.
 let cityCatalog: [CityTimeZone] = [
     CityTimeZone(city: "Bali", timeZoneIdentifier: "Asia/Makassar", isLocal: true),
     CityTimeZone(city: "New York", timeZoneIdentifier: "America/New_York"),
