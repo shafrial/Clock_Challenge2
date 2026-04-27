@@ -32,33 +32,14 @@ struct ContentView: View {
             ZStack {
                 VStack(spacing: 0) {
                     // List of all selected cities displaying their respective times
-                    List {
-                        ForEach(cities) { city in
-                            TimeZoneCardView(
-                                city: city,
-                                referenceDate: referenceDate,
-                                baseTZ: baseTZ
-                            )
-                            // Remove default list padding and styling for a cleaner look
-                            .listRowInsets(
-                                EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
-                            )
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                            // Allow users to delete non-local cities with a swipe gesture
-                            .swipeActions(edge: .trailing, allowsFullSwipe: !city.isLocal) {
-                                if !city.isLocal {
-                                    Button(role: .destructive) {
-                                        deleteCity(city)
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                }
-                            }
+                    TimeZoneCardListView(
+                        cities: cities,
+                        referenceDate: referenceDate,
+                        baseTZ: baseTZ,
+                        onDeleteCity: { city in
+                            deleteCity(city)
                         }
-                    }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
+                    )
                     
                     // The custom timeline slider for adjusting the time manually
                     HorizontalDialSliderView(
