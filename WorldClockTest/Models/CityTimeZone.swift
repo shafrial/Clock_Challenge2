@@ -26,6 +26,10 @@ struct CityTimeZone: Identifiable {
         TimeZone(identifier: timeZoneIdentifier) ?? .current
     }
 
+    var displayTimeZoneIdentifier: String {
+        timeZoneIdentifier.replacingOccurrences(of: "_", with: " ")
+    }
+
     // MARK: - Time Formatting
 
     func formattedHourMinute(for date: Date) -> String {

@@ -39,6 +39,7 @@ struct AddCitySheetView: View {
         // Filter the available cities by matching the search text against city name or time zone identifier
         return availableCities.filter { city in
             city.city.localizedCaseInsensitiveContains(searchText) ||
+            city.displayTimeZoneIdentifier.localizedCaseInsensitiveContains(searchText) ||
             city.timeZoneIdentifier.localizedCaseInsensitiveContains(searchText)
         }
     }
@@ -69,7 +70,7 @@ struct AddCitySheetView: View {
                                     .foregroundStyle(.primary)
 
                                 // Time Zone Identifier
-                                Text(city.timeZoneIdentifier)
+                                Text(city.displayTimeZoneIdentifier)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
